@@ -3,8 +3,8 @@
 
 OS_API = 'http://plexapp.api.opensubtitles.org/xml-rpc'
 OS_LANGUAGE_CODES = 'http://www.opensubtitles.org/addons/export_languages.php'
-#OS_PLEX_USERAGENT = 'plexapp.com v9.0'
-OS_PLEX_USERAGENT = 'OS Test User Agent'
+OS_PLEX_USERAGENT = 'plexapp.com v9.0'
+#OS_PLEX_USERAGENT = 'OS Test User Agent'
 subtitleExt       = ['utf','utf8','utf-8','sub','srt','smi','rt','ssa','aqt','jss','ass','idx']
  
 def Start():
@@ -45,8 +45,9 @@ def fetchSubtitles(proxy, token, part, imdbID=''):
   if Prefs["langPref2"] != 'None' and Prefs["langPref1"] != Prefs["langPref2"]:
     langList.append(Prefs["langPref2"])
   for l in langList:
-    Log('Looking for match for GUID %s and size %d' % (part.openSubtitleHash, part.size))
+    Log('Looking for match for GUID %s and size %d and language %s' % (part.openSubtitleHash, part.size, l))
     proxyResponse = proxy.SearchSubtitles(token,[{'sublanguageid':l, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])
+    #Log('DEBUG proxyReponse: %s' % proxyResponse)
     if proxyResponse['status'] != "200 OK":
        Log('Error return by XMLRPC proxy: %s' % proxyResponse['status'])
     else:
@@ -61,19 +62,20 @@ def fetchSubtitles(proxy, token, part, imdbID=''):
          else:
             #Log(subtitleResponse)
             subtitleResponse = proxyResponse['data']
-         if subtitleResponse != False:
-            for st in subtitleResponse: #remove any subtitle formats we don't recognize
-              if st['SubFormat'] not in subtitleExt:
-                Log('Removing a subtitle of type: ' + st['SubFormat'])
-                subtitleResponse.remove(st)
-            st = sorted(subtitleResponse, key=lambda k: int(k['SubDownloadsCnt']), reverse=True)[0] #most downloaded subtitle file for current language
-            if st['SubFormat'] in subtitleExt:
-              subUrl = st['SubDownloadLink']
-              subGz = HTTP.Request(subUrl, headers={'Accept-Encoding':''}).content
-              subData = Archive.GzipDecompress(subGz)
-              part.subtitles[Locale.Language.Match(st['SubLanguageID'])][subUrl] = Proxy.Media(subData, ext=st['SubFormat'])
-         else:
-            Log('No subtitles available for language ' + l)
+       if subtitleResponse != False:
+          for st in subtitleResponse: #remove any subtitle formats we don't recognize
+            if st['SubFormat'] not in subtitleExt:
+              Log('Removing a subtitle of type: ' + st['SubFormat'])
+              subtitleResponse.remove(st)
+          st = sorted(subtitleResponse, key=lambda k: int(k['SubDownloadsCnt']), reverse=True)[0] #most downloaded subtitle file for current language
+          if st['SubFormat'] in subtitleExt:
+            subUrl = st['SubDownloadLink']
+            Log('fetching: %s' % subUrl)
+            subGz = HTTP.Request(subUrl, headers={'Accept-Encoding':''}).content
+            subData = Archive.GzipDecompress(subGz)
+            part.subtitles[Locale.Language.Match(st['SubLanguageID'])][subUrl] = Proxy.Media(subData, ext=st['SubFormat'])
+       else:
+          Log('No subtitles available for language ' + l)
   
 class OpenSubtitlesAgentMovies(Agent.Movies):
   name = 'OpenSubtitles.org'
