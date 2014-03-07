@@ -66,31 +66,7 @@ def fetchSubtitles(proxy, token, part, imdbID=''):
         subData = Archive.GzipDecompress(subGz)
         part.subtitles[Locale.Language.Match(st['SubLanguageID'])][subUrl] = Proxy.Media(subData, ext=st['SubFormat'])
     else:
-       subtitleResponse = proxyResponse['data']
-       #Log('hash/size search result: ')
-       #Log(subtitleResponse)
-       if subtitleResponse == False and imdbID != '': #let's try the imdbID, if we have one...
-         Log('Found nothing via hash, trying search with imdbid: ' + imdbID)
-         proxyResponse = proxy.SearchSubtitles(token,[{'sublanguageid':l, 'imdbid':imdbID}])
-         if proxyResponse['status'] != "200 OK":
-            Log('Error return by XMLRPC proxy: %s' % proxyResponse['status'])
-         else:
-            #Log(subtitleResponse)
-            subtitleResponse = proxyResponse['data']
-       if subtitleResponse != False:
-          for st in subtitleResponse: #remove any subtitle formats we don't recognize
-            if st['SubFormat'] not in subtitleExt:
-              Log('Removing a subtitle of type: ' + st['SubFormat'])
-              subtitleResponse.remove(st)
-          st = sorted(subtitleResponse, key=lambda k: int(k['SubDownloadsCnt']), reverse=True)[0] #most downloaded subtitle file for current language
-          if st['SubFormat'] in subtitleExt:
-            subUrl = st['SubDownloadLink']
-            Log('fetching: %s' % subUrl)
-            subGz = HTTP.Request(subUrl, headers={'Accept-Encoding':''}).content
-            subData = Archive.GzipDecompress(subGz)
-            part.subtitles[Locale.Language.Match(st['SubLanguageID'])][subUrl] = Proxy.Media(subData, ext=st['SubFormat'])
-       else:
-          Log('No subtitles available for language ' + l)
+      Log('No subtitles available for language ' + l)
   
 class OpenSubtitlesAgentMovies(Agent.Movies):
   name = 'OpenSubtitles.org'
