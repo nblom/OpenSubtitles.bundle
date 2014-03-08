@@ -39,35 +39,51 @@ def opensubtitlesProxy():
   token = proxy.LogIn(username, password, 'en', OS_PLEX_USERAGENT)['token']
   return (proxy, token)
 
-def fetchSubtitles(proxy, token, part, imdbID=''):
+def getLangList():
   langList = [Prefs["langPref1"]]
   if Prefs["langPref2"] != 'None' and Prefs["langPref1"] != Prefs["langPref2"]:
     langList.append(Prefs["langPref2"])
-  for l in langList:
-    Log('Looking for match for GUID %s and size %d and language %s' % (part.openSubtitleHash, part.size, l))
-    subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':l, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])['data']
-    #Log('hash/size search result: ')
+  return langList
+
+def fetchSubtitles(proxy, token, part, language):
+  Log('Looking for match for GUID %s and size %d and language %s' % (part.openSubtitleHash, part.size, language))
+  subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])['data']
+  #Log('hash/size search result: ')
+  #Log(subtitleResponse)
+  #if subtitleResponse['status'] != "200 OK":
+  #   Log('Error return by XMLRPC proxy: %s' % subtitleResponse['status'])
+  return subtitleResponse
+    
+ 
+def filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata):
+  imdbID = metadata.id
+  if subtitleResponse == False and imdbID != '': #let's try the imdbID, if we have one...
+    Log('Found nothing via hash, trying search with imdbid: ' + imdbID)
+    subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':l, 'imdbid':imdbID}])['data']
     #Log(subtitleResponse)
-    if subtitleResponse['status'] != "200 OK":
-       Log('Error return by XMLRPC proxy: %s' % subtitleResponse['status'])
-    if subtitleResponse == False and imdbID != '': #let's try the imdbID, if we have one...
-      subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':l, 'imdbid':imdbID}])['data']
-      Log('Found nothing via hash, trying search with imdbid: ' + imdbID)
-      #Log(subtitleResponse)
-    if subtitleResponse != False:
+    return subtitleResponse
+  
+def filsterSubtitleResponseForTVShow(subtitleResponse):
+  return subtitleResponse
+
+def downloadBestSubtitle(subtitleResponse, part, language):
+  #Suppress all subtitle format no supported
+  if subtitleResponse != False:
       for st in subtitleResponse: #remove any subtitle formats we don't recognize
         if st['SubFormat'] not in subtitleExt:
           Log('Removing a subtitle of type: ' + st['SubFormat'])
           subtitleResponse.remove(st)
-      st = sorted(subtitleResponse, key=lambda k: int(k['SubDownloadsCnt']), reverse=True)[0] #most downloaded subtitle file for current language
-      if st['SubFormat'] in subtitleExt:
-        subUrl = st['SubDownloadLink']
-        subGz = HTTP.Request(subUrl, headers={'Accept-Encoding':'gzip'}).content
-        subData = Archive.GzipDecompress(subGz)
-        part.subtitles[Locale.Language.Match(st['SubLanguageID'])][subUrl] = Proxy.Media(subData, ext=st['SubFormat'])
-    else:
-      Log('No subtitles available for language ' + l)
-  
+  if subtitleResponse != False:
+  #Download the most downloaded sub in the filtered list.
+    st = sorted(subtitleResponse, key=lambda k: int(k['SubDownloadsCnt']), reverse=True)[0] #most downloaded subtitle file for current language
+    subUrl = st['SubDownloadLink']
+    subGz = HTTP.Request(subUrl, headers={'Accept-Encoding':'gzip'}).content
+    subData = Archive.GzipDecompress(subGz)
+    part.subtitles[Locale.Language.Match(st['SubLanguageID'])][subUrl] = Proxy.Media(subData, ext=st['SubFormat'])
+  else:
+    Log('No subtitles available for language ' + language)
+
+
 class OpenSubtitlesAgentMovies(Agent.Movies):
   name = 'OpenSubtitles.org'
   languages = [Locale.Language.NoLanguage]
@@ -86,7 +102,11 @@ class OpenSubtitlesAgentMovies(Agent.Movies):
     (proxy, token) = opensubtitlesProxy()
     for i in media.items:
       for part in i.parts:
-        fetchSubtitles(proxy, token, part, metadata.id)
+        for language in getLangList():
+          subtitleResponse = fetchSubtitles(proxy, token, part, language)
+          subtitleResponse = filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata)
+          downloadBestSubtitle(subtitleResponse, part, language)
+          
 
 class OpenSubtitlesAgentTV(Agent.TV_Shows):
   name = 'OpenSubtitles.org'
@@ -108,4 +128,8 @@ class OpenSubtitlesAgentTV(Agent.TV_Shows):
         for e in media.seasons[s].episodes:
           for i in media.seasons[s].episodes[e].items:
             for part in i.parts:
-              fetchSubtitles(proxy, token, part)
+              for language in getLangList():
+                subtitleResponse = fetchSubtitles(proxy, token, part, language)
+                subtitleResponse = filsterSubtitleResponseForTVShow(subtitleResponse)
+                downloadBestSubtitle(subtitleResponse, part, language)
+                  
