@@ -45,13 +45,24 @@ def getLangList():
     langList.append(Prefs["langPref2"])
   return langList
 
+def logSubtitleResponse(subtitleResponse):
+  #Prety way to display subtitleResponse in Logs
+  Log('Current subtitleResponse has %d elements:' % len(subtitleResponse))
+  for item in subtitleResponse:
+    Log(' - MovieName: %s | MovieYear: %s | MovieNameEng: %s | SubAddDate: %s | SubBad: %s | SubRating: %s | SubDownloadsCnt: %s | IDMovie: %s | IDMovieImdb: %s' % (item['MovieName'], item['MovieYear'], item['MovieNameEng'], item['SubAddDate'], item['SubBad'], item['SubRating'], item['SubDownloadsCnt'], item['IDMovie'], item['IDMovieImdb']))
+
 def fetchSubtitles(proxy, token, part, language):
   Log('Looking for match for GUID %s and size %d and language %s' % (part.openSubtitleHash, part.size, language))
-  subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])['data']
-  #Log('hash/size search result: ')
-  #Log(subtitleResponse)
-  #if subtitleResponse['status'] != "200 OK":
-  #   Log('Error return by XMLRPC proxy: %s' % subtitleResponse['status'])
+  #subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])['data']
+  proxyResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])
+  if proxyResponse['status'] != "200 OK":
+    Log('Error return by XMLRPC proxy: %s' % proxyResponse['status'])
+    subtitleResponse = False
+  else:
+    subtitleResponse = proxyResponse['data']
+    Log('hash/size search result: ')
+    logSubtitleResponse(subtitleResponse)
+  
   return subtitleResponse
     
  
@@ -61,9 +72,16 @@ def filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata):
     Log('Found nothing via hash, trying search with imdbid: ' + imdbID)
     subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':l, 'imdbid':imdbID}])['data']
     #Log(subtitleResponse)
+
+    #I don't know if I can filter on the name of the movie due to some metadata agent return Movie name in an other language.
+
     return subtitleResponse
   
 def filsterSubtitleResponseForTVShow(subtitleResponse):
+  #I don't know if I can filter on the tvshow name as some metadata agent return TBVShow name in other language.
+
+
+
   return subtitleResponse
 
 def downloadBestSubtitle(subtitleResponse, part, language):
