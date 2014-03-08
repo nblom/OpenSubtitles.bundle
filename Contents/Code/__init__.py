@@ -52,6 +52,11 @@ def logSubtitleResponse(subtitleResponse):
     Log(' - MovieName: %s | MovieYear: %s | MovieNameEng: %s | SubAddDate: %s | SubBad: %s | SubRating: %s | SubDownloadsCnt: %s | IDMovie: %s | IDMovieImdb: %s' % (item['MovieName'], item['MovieYear'], item['MovieNameEng'], item['SubAddDate'], item['SubBad'], item['SubRating'], item['SubDownloadsCnt'], item['IDMovie'], item['IDMovieImdb']))
 
 def fetchSubtitles(proxy, token, part, language):
+
+  # Remove all previous subs (taken from sender1 fork)
+  for l in part.subtitles:
+    part.subtitles[l].validate_keys([])
+
   Log('Looking for match for GUID %s and size %d and language %s' % (part.openSubtitleHash, part.size, language))
   #subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])['data']
   proxyResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])
