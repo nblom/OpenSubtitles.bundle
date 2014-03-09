@@ -7,7 +7,8 @@ OS_PLEX_USERAGENT = 'plexapp.com v9.0'
 #OS_PLEX_USERAGENT = 'OS Test User Agent'
 subtitleExt       = ['utf','utf8','utf-8','sub','srt','smi','rt','ssa','aqt','jss','ass','idx']
  
-OS_ORDER_PENALTY = -1   # Penalty apply to subs score due to position in sub list return by OS.org
+OS_ORDER_PENALTY = -1   # Penalty applied to subs score due to position in sub list return by OS.org
+OS_TVSHOWS_GOOD_SEASON_BONUS = 30 # Bonus applied to subs if the season match
 
 def Start():
   HTTP.CacheTime = CACHE_1DAY
@@ -82,7 +83,7 @@ def fetchSubtitles(proxy, token, part, language):
       firstScore = firstScore + OS_ORDER_PENALTY
 
     Log('hash/size search result: ')
-    logFilteredSubtitleResponse(subtitleResponse)
+    #logFilteredSubtitleResponse(subtitleResponse)
 
     #Add filters for common to Movies and TVShows
   
@@ -100,12 +101,20 @@ def filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata):
 
     return subtitleResponse
   
-def filsterSubtitleResponseForTVShow(subtitleResponse):
-  #I don't know if I can filter on the tvshow name as some metadata agent return TBVShow name in other language.
+def filsterSubtitleResponseForTVShow(subtitleResponse, season):
+  #I don't know if I can filter on the tvshow name as some metadata agent return TVShow name in other language.
+  # I don't know if I can filter on the episode dut to some difference beteween air order and DVD order.
 
+  filteredSubtitleResponse = []
+  for sub in subtitleResponse:
+    #If season match add a bonus to the score
+    if int(sub['SeriesSeason']) == int(season):
+      sub['PlexScore'] = sub['PlexScore'] + OS_TVSHOWS_GOOD_SEASON_BONUS
 
+    filteredSubtitleResponse.append(sub)
 
-  return subtitleResponse
+  logFilteredSubtitleResponse(filteredSubtitleResponse)
+  return filteredSubtitleResponse
 
 def downloadBestSubtitle(subtitleResponse, part, language):
   #Suppress all subtitle format no supported
@@ -123,6 +132,7 @@ def downloadBestSubtitle(subtitleResponse, part, language):
     subUrl = st['SubDownloadLink']
     subGz = HTTP.Request(subUrl, headers={'Accept-Encoding':'gzip'}).content
     subData = Archive.GzipDecompress(subGz)
+    # Supression of previous sub should be there to avoid wiping a sub not anymore in OS
     part.subtitles[Locale.Language.Match(st['SubLanguageID'])][subUrl] = Proxy.Media(subData, ext=st['SubFormat'])
   else:
     Log('No subtitles available for language ' + language)
@@ -171,11 +181,12 @@ class OpenSubtitlesAgentTV(Agent.TV_Shows):
 
   def update(self, metadata, media, lang):
     (proxy, token) = opensubtitlesProxy()
-    for s in media.seasons:
+    for season in media.seasons:
       # just like in the Local Media Agent, if we have a date-based season skip for now.
-      if int(s) < 1900:
-        for e in media.seasons[s].episodes:
-          for i in media.seasons[s].episodes[e].items:
+      if int(season) < 1900:
+        for episode in media.seasons[season].episodes:
+          for i in media.seasons[season].episodes[episode].items:
+            Log("Show: %s, Season: %s, Ep: %s" % (media.title, season, episode))
             for part in i.parts:
               # Remove all previous subs (taken from sender1 fork)
               for l in part.subtitles:
@@ -184,6 +195,6 @@ class OpenSubtitlesAgentTV(Agent.TV_Shows):
               # go fetch subtilte fo each language
               for language in getLangList():
                 subtitleResponse = fetchSubtitles(proxy, token, part, language)
-                subtitleResponse = filsterSubtitleResponseForTVShow(subtitleResponse)
+                subtitleResponse = filsterSubtitleResponseForTVShow(subtitleResponse, season)
                 downloadBestSubtitle(subtitleResponse, part, language)
                   
