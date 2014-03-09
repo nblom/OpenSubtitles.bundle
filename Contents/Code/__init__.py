@@ -7,6 +7,8 @@ OS_PLEX_USERAGENT = 'plexapp.com v9.0'
 #OS_PLEX_USERAGENT = 'OS Test User Agent'
 subtitleExt       = ['utf','utf8','utf-8','sub','srt','smi','rt','ssa','aqt','jss','ass','idx']
  
+OS_ORDER_PENALTY = -1   # Penalty apply to subs score due to position in sub list return by OS.org
+
 def Start():
   HTTP.CacheTime = CACHE_1DAY
   HTTP.Headers['User-Agent'] = 'plexapp.com v9.0'
@@ -45,30 +47,46 @@ def getLangList():
     langList.append(Prefs["langPref2"])
   return langList
 
-def logSubtitleResponse(subtitleResponse):
-  #Prety way to display subtitleResponse in Logs
+def logFilteredSubtitleResponseItem(item):
+  #Keys available: ['ISO639', 'SubComments', 'UserID', 'SubFileName', 'SubAddDate', 'SubBad', 'SubLanguageID', 'SeriesEpisode', 'MovieImdbRating', 'SubHash', 'MovieReleaseName', 'SubtitlesLink', 'IDMovie', 'SeriesIMDBParent', 'SubDownloadsCnt', 'QueryParameters', 'MovieByteSize', 'MovieKind', 'SeriesSeason', 'IDSubMovieFile', 'SubSize', 'IDSubtitle', 'IDSubtitleFile', 'MovieFPS', 'SubSumCD', 'QueryNumber', 'SubAuthorComment', 'MovieNameEng', 'MatchedBy', 'SubHD', 'SubRating', 'SubDownloadLink', 'SubHearingImpaired', 'ZipDownloadLink', 'SubFeatured', 'MovieTimeMS', 'SubActualCD', 'UserNickName', 'SubFormat', 'MovieHash', 'LanguageName', 'UserRank', 'MovieName', 'IDMovieImdb', 'MovieYear']
+  Log(' - PlexScore: %d | MovieName: %s | MovieYear: %s | MovieNameEng: %s | SubAddDate: %s | SubBad: %s | SubRating: %s | SubDownloadsCnt: %s | IDMovie: %s | IDMovieImdb: %s' % (item['PlexScore'], item['MovieName'], item['MovieYear'], item['MovieNameEng'], item['SubAddDate'], item['SubBad'], item['SubRating'], item['SubDownloadsCnt'], item['IDMovie'], item['IDMovieImdb']))
+
+def logFilteredSubtitleResponse(subtitleResponse):
+  #Prety way to display subtitleResponse in Logs sorted by PlexScore
+  #Keys available: ['ISO639', 'SubComments', 'UserID', 'SubFileName', 'SubAddDate', 'SubBad', 'SubLanguageID', 'SeriesEpisode', 'MovieImdbRating', 'SubHash', 'MovieReleaseName', 'SubtitlesLink', 'IDMovie', 'SeriesIMDBParent', 'SubDownloadsCnt', 'QueryParameters', 'MovieByteSize', 'MovieKind', 'SeriesSeason', 'IDSubMovieFile', 'SubSize', 'IDSubtitle', 'IDSubtitleFile', 'MovieFPS', 'SubSumCD', 'QueryNumber', 'SubAuthorComment', 'MovieNameEng', 'MatchedBy', 'SubHD', 'SubRating', 'SubDownloadLink', 'SubHearingImpaired', 'ZipDownloadLink', 'SubFeatured', 'MovieTimeMS', 'SubActualCD', 'UserNickName', 'SubFormat', 'MovieHash', 'LanguageName', 'UserRank', 'MovieName', 'IDMovieImdb', 'MovieYear']
   Log('Current subtitleResponse has %d elements:' % len(subtitleResponse))
-  for item in subtitleResponse:
-    Log(' - MovieName: %s | MovieYear: %s | MovieNameEng: %s | SubAddDate: %s | SubBad: %s | SubRating: %s | SubDownloadsCnt: %s | IDMovie: %s | IDMovieImdb: %s' % (item['MovieName'], item['MovieYear'], item['MovieNameEng'], item['SubAddDate'], item['SubBad'], item['SubRating'], item['SubDownloadsCnt'], item['IDMovie'], item['IDMovieImdb']))
-
+  for item in sorted(subtitleResponse, key=lambda k: k['PlexScore'], reverse=True):
+    logFilteredSubtitleResponseItem(item)
+    
 def fetchSubtitles(proxy, token, part, language):
-
-  # Remove all previous subs (taken from sender1 fork)
-  for l in part.subtitles:
-    part.subtitles[l].validate_keys([])
-
+  # Download OS result based on hash and size
   Log('Looking for match for GUID %s and size %d and language %s' % (part.openSubtitleHash, part.size, language))
   #subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])['data']
   proxyResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])
+  
+  #Check Server Response status
   if proxyResponse['status'] != "200 OK":
     Log('Error return by XMLRPC proxy: %s' % proxyResponse['status'])
-    subtitleResponse = False
+    filteredSubtitleResponse = False
   else:
     subtitleResponse = proxyResponse['data']
+    #Log('Keys available: %s' % subtitleResponse[0].keys())
+    
+    #Start to score each subs
+    firstScore = 50
+    filteredSubtitleResponse = []
+    for sub in subtitleResponse:
+      #add default score
+      sub['PlexScore'] = firstScore;
+      filteredSubtitleResponse.append(sub)
+      firstScore = firstScore + OS_ORDER_PENALTY
+
     Log('hash/size search result: ')
-    logSubtitleResponse(subtitleResponse)
+    logFilteredSubtitleResponse(subtitleResponse)
+
+    #Add filters for common to Movies and TVShows
   
-  return subtitleResponse
+  return filteredSubtitleResponse
     
  
 def filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata):
@@ -97,8 +115,11 @@ def downloadBestSubtitle(subtitleResponse, part, language):
           Log('Removing a subtitle of type: ' + st['SubFormat'])
           subtitleResponse.remove(st)
   if subtitleResponse != False:
-  #Download the most downloaded sub in the filtered list.
-    st = sorted(subtitleResponse, key=lambda k: int(k['SubDownloadsCnt']), reverse=True)[0] #most downloaded subtitle file for current language
+  #Download the sub with the higest PlexScore in the filtered list.
+  #TODO Perhaps choose in case of equality with Download count.
+    st = sorted(subtitleResponse, key=lambda k: ['PlexScore'], reverse=True)[0] #most downloaded subtitle file for current language
+    Log('Best subtitle is:')
+    logFilteredSubtitleResponseItem(st)
     subUrl = st['SubDownloadLink']
     subGz = HTTP.Request(subUrl, headers={'Accept-Encoding':'gzip'}).content
     subData = Archive.GzipDecompress(subGz)
@@ -125,6 +146,11 @@ class OpenSubtitlesAgentMovies(Agent.Movies):
     (proxy, token) = opensubtitlesProxy()
     for i in media.items:
       for part in i.parts:
+        # Remove all previous subs (taken from sender1 fork)
+        for l in part.subtitles:
+          part.subtitles[l].validate_keys([])
+
+        # go fetch subtilte fo each language
         for language in getLangList():
           subtitleResponse = fetchSubtitles(proxy, token, part, language)
           subtitleResponse = filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata)
@@ -151,6 +177,11 @@ class OpenSubtitlesAgentTV(Agent.TV_Shows):
         for e in media.seasons[s].episodes:
           for i in media.seasons[s].episodes[e].items:
             for part in i.parts:
+              # Remove all previous subs (taken from sender1 fork)
+              for l in part.subtitles:
+                part.subtitles[l].validate_keys([])
+
+              # go fetch subtilte fo each language
               for language in getLangList():
                 subtitleResponse = fetchSubtitles(proxy, token, part, language)
                 subtitleResponse = filsterSubtitleResponseForTVShow(subtitleResponse)
