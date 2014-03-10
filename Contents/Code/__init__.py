@@ -8,7 +8,11 @@ OS_PLEX_USERAGENT = 'plexapp.com v9.0'
 subtitleExt       = ['utf','utf8','utf-8','sub','srt','smi','rt','ssa','aqt','jss','ass','idx']
  
 OS_ORDER_PENALTY = -1   # Penalty applied to subs score due to position in sub list return by OS.org
-OS_TVSHOWS_GOOD_SEASON_BONUS = 30 # Bonus applied to subs if the season match
+OS_TVSHOWS_GOOD_SEASON_BONUS = 30 # Bonus applied to TVShows subs if the season match
+
+#Useless since imdb ids seems to not be in metadata available for tv shows.
+OS_TVSHOWS_SHOW_IMDB_ID_MATCH_BONUS = 30 # Bonus applied to TVShows subs if the imdbID of the show match
+OS_TVSHOWS_EPISODE_IMDB_ID_MATCH_BONUS = 50 # Bonus applied to TVShows subs if the imdbID of the episode match
 
 def Start():
   HTTP.CacheTime = CACHE_1DAY
@@ -92,6 +96,7 @@ def fetchSubtitles(proxy, token, part, language):
  
 def filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata):
   imdbID = metadata.id
+  #TODO: this part should be done before to apply common filter on the result by imdbID
   if subtitleResponse == False and imdbID != '': #let's try the imdbID, if we have one...
     Log('Found nothing via hash, trying search with imdbid: ' + imdbID)
     subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':l, 'imdbid':imdbID}])['data']
@@ -101,7 +106,7 @@ def filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata):
 
     return subtitleResponse
   
-def filsterSubtitleResponseForTVShow(subtitleResponse, season):
+def filsterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media):
   #I don't know if I can filter on the tvshow name as some metadata agent return TVShow name in other language.
   # I don't know if I can filter on the episode dut to some difference beteween air order and DVD order.
 
@@ -110,6 +115,11 @@ def filsterSubtitleResponseForTVShow(subtitleResponse, season):
     #If season match add a bonus to the score
     if int(sub['SeriesSeason']) == int(season):
       sub['PlexScore'] = sub['PlexScore'] + OS_TVSHOWS_GOOD_SEASON_BONUS
+
+    #If imdbID match add a bonus to the score
+    #IDMovieImdb for episode
+    #SeriesIMDBParent for TVShow
+    #Impossible since IMDB id is not in metadata. Potential solution query theTVDB do find the IMDB from TVDB id
 
     filteredSubtitleResponse.append(sub)
 
@@ -186,7 +196,7 @@ class OpenSubtitlesAgentTV(Agent.TV_Shows):
       if int(season) < 1900:
         for episode in media.seasons[season].episodes:
           for i in media.seasons[season].episodes[episode].items:
-            Log("Show: %s, Season: %s, Ep: %s" % (media.title, season, episode))
+            Log("Show: %s, Season: %s, Ep: %s, id:%s" % (media.title, season, episode, media.seasons[season].episodes[episode].id))
             for part in i.parts:
               # Remove all previous subs (taken from sender1 fork)
               for l in part.subtitles:
@@ -195,6 +205,6 @@ class OpenSubtitlesAgentTV(Agent.TV_Shows):
               # go fetch subtilte fo each language
               for language in getLangList():
                 subtitleResponse = fetchSubtitles(proxy, token, part, language)
-                subtitleResponse = filsterSubtitleResponseForTVShow(subtitleResponse, season)
+                subtitleResponse = filsterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media)
                 downloadBestSubtitle(subtitleResponse, part, language)
                   
