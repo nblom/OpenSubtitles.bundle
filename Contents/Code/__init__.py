@@ -12,7 +12,7 @@ OS_BAD_SUBTITLE_PENALTY = -1000 # Penalty applied to subs score due to flag bad 
 OS_WRONG_MOVIE_KIND_PENALTY = -1000 # Penalty applied if the video have the wrong kind (episode or movie)
 OS_HEARING_IMPAIRED_BONUS = 10 # Bonus added for subs hearing impaired tagged when the pref is set to yes
 OS_TVSHOWS_GOOD_SEASON_BONUS = 30 # Bonus applied to TVShows subs if the season match
-
+OS_MOVIE_IMDB_MATCH_BONUS = 50 # Bonus applied for a movie if the imdb id return by OS match the metadata in Plex
 
 #Useless since imdb ids seems to not be in metadata available for tv shows.
 OS_TVSHOWS_SHOW_IMDB_ID_MATCH_BONUS = 30 # Bonus applied to TVShows subs if the imdbID of the show match
@@ -131,7 +131,9 @@ def filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata):
       if sub['MovieKind']!='movie':
         sub['PlexScore']=sub['PlexScore'] + OS_WRONG_MOVIE_KIND_PENALTY
 
-      #TODO: check if the imdbID match
+      #check if the imdbID match
+      if sub['IDMovieImdb'] == metadata.id:
+        sub['PlexScore'] = sub['PlexScore'] + OS_MOVIE_IMDB_MATCH_BONUS
 
       filteredSubtitleResponse.append(sub)
     logFilteredSubtitleResponse(filteredSubtitleResponse)
