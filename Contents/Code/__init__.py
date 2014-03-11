@@ -9,6 +9,7 @@ subtitleExt       = ['utf','utf8','utf-8','sub','srt','smi','rt','ssa','aqt','js
  
 OS_ORDER_PENALTY = -1   # Penalty applied to subs score due to position in sub list return by OS.org
 OS_BAD_SUBTITLE_PENALTY = -1000 # Penalty applied to subs score due to flag bad subtitle in response.
+OS_WRONG_MOVIE_KIND_PENALTY = -1000 # Penalty applied if the video have the wrong kind (episode or movie)
 OS_HEARING_IMPAIRED_BONUS = 10 # Bonus added for subs hearing impaired tagged when the pref is set to yes
 OS_TVSHOWS_GOOD_SEASON_BONUS = 30 # Bonus applied to TVShows subs if the season match
 
@@ -58,7 +59,7 @@ def getLangList():
 def logFilteredSubtitleResponseItem(item):
   #Log('Keys available: %s' % subtitleResponse[0].keys())
   #Keys available: ['ISO639', 'SubComments', 'UserID', 'SubFileName', 'SubAddDate', 'SubBad', 'SubLanguageID', 'SeriesEpisode', 'MovieImdbRating', 'SubHash', 'MovieReleaseName', 'SubtitlesLink', 'IDMovie', 'SeriesIMDBParent', 'SubDownloadsCnt', 'QueryParameters', 'MovieByteSize', 'MovieKind', 'SeriesSeason', 'IDSubMovieFile', 'SubSize', 'IDSubtitle', 'IDSubtitleFile', 'MovieFPS', 'SubSumCD', 'QueryNumber', 'SubAuthorComment', 'MovieNameEng', 'MatchedBy', 'SubHD', 'SubRating', 'SubDownloadLink', 'SubHearingImpaired', 'ZipDownloadLink', 'SubFeatured', 'MovieTimeMS', 'SubActualCD', 'UserNickName', 'SubFormat', 'MovieHash', 'LanguageName', 'UserRank', 'MovieName', 'IDMovieImdb', 'MovieYear']
-  Log(' - PlexScore: %d | MovieName: %s | MovieYear: %s | MovieNameEng: %s | SubAddDate: %s | SubBad: %s | SubHearingImpaired: %s | SubRating: %s | SubDownloadsCnt: %s | IDMovie: %s | IDMovieImdb: %s' % (item['PlexScore'], item['MovieName'], item['MovieYear'], item['MovieNameEng'], item['SubAddDate'], item['SubBad'], item['SubHearingImpaired'], item['SubRating'], item['SubDownloadsCnt'], item['IDMovie'], item['IDMovieImdb']))
+  Log(' - PlexScore: %d | MovieName: %s | MovieKind: %s | MovieYear: %s | MovieNameEng: %s | SubAddDate: %s | SubBad: %s | SubHearingImpaired: %s | SubRating: %s | SubDownloadsCnt: %s | IDMovie: %s | IDMovieImdb: %s' % (item['PlexScore'], item['MovieName'], item['MovieKind'], item['MovieYear'], item['MovieNameEng'], item['SubAddDate'], item['SubBad'], item['SubHearingImpaired'], item['SubRating'], item['SubDownloadsCnt'], item['IDMovie'], item['IDMovieImdb']))
 
 def logFilteredSubtitleResponse(subtitleResponse):
   #Prety way to display subtitleResponse in Logs sorted by PlexScore
@@ -97,7 +98,7 @@ def fetchSubtitles(proxy, token, part, language):
         #TODO: filter depending on the subs rating
 
         #filter depending on a pref on SubHearingImpaired
-        #TODO:Perhaps we can filter that just before download
+        #TODO: Perhaps we can filter that just before download
         if Prefs['HearingImpairedPref'] == 'Yes' and int(sub['SubHearingImpaired'])==1:
           sub['PlexScore'] = sub['PlexScore'] + OS_HEARING_IMPAIRED_BONUS
 
@@ -115,18 +116,30 @@ def fetchSubtitles(proxy, token, part, language):
 def filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata):
   imdbID = metadata.id
   #TODO: this part should be done before to apply common filter on the result by imdbID
-  if subtitleResponse == False and imdbID != '': #let's try the imdbID, if we have one...
-    Log('Found nothing via hash, trying search with imdbid: ' + imdbID)
-    subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':l, 'imdbid':imdbID}])['data']
+  #if subtitleResponse == False and imdbID != '': #let's try the imdbID, if we have one...
+    #Log('Found nothing via hash, trying search with imdbid: ' + imdbID)
+    #subtitleResponse = proxy.SearchSubtitles(token,[{'sublanguageid':l, 'imdbid':imdbID}])['data']
     #Log(subtitleResponse)
 
-    #I don't know if I can filter on the name of the movie due to some metadata agent return Movie name in an other language.
+  if subtitleResponse == False:
+    filteredSubtitleResponse = False
+  else:
+    #I can't filter on the name of the movie due to some metadata agent return Movie name in an other language.
+    
+    filteredSubtitleResponse = []
+    for sub in subtitleResponse:
+      if sub['MovieKind']!='movie':
+        sub['PlexScore']=sub['PlexScore'] + OS_WRONG_MOVIE_KIND_PENALTY
 
-    #TODO: check if the imdbID match
+      #TODO: check if the imdbID match
 
-    return subtitleResponse
+      filteredSubtitleResponse.append(sub)
+    logFilteredSubtitleResponse(filteredSubtitleResponse)
   
-def filsterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media):
+
+  return filteredSubtitleResponse
+  
+def filterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media):
   # I can't filter on the tvshow name as some metadata agent return TVShow name in other language.
   # I can't filter on the episode dut to some difference beteween air order and DVD order.
   if subtitleResponse == False:
@@ -143,7 +156,9 @@ def filsterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media):
       #SeriesIMDBParent for TVShow
       #Impossible since IMDB id is not in metadata. Potential solution query theTVDB do find the IMDB from TVDB id
 
-      #TODO: Check if video type match a tvshow
+      #Check if video type match a tvshow
+      if sub['MovieKind'] != 'episode':
+        sub['PlexScore']=sub['PlexScore'] + OS_WRONG_MOVIE_KIND_PENALTY
 
 
       filteredSubtitleResponse.append(sub)
@@ -190,6 +205,7 @@ class OpenSubtitlesAgentMovies(Agent.Movies):
   def update(self, metadata, media, lang):
     (proxy, token) = opensubtitlesProxy()
     for i in media.items:
+      Log("Movie: %s, id:%s" % (media.title, media.id))
       for part in i.parts:
         # Remove all previous subs (taken from sender1 fork)
         for l in part.subtitles:
@@ -230,6 +246,6 @@ class OpenSubtitlesAgentTV(Agent.TV_Shows):
               # go fetch subtilte fo each language
               for language in getLangList():
                 subtitleResponse = fetchSubtitles(proxy, token, part, language)
-                subtitleResponse = filsterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media)
+                subtitleResponse = filterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media)
                 downloadBestSubtitle(subtitleResponse, part, language)
                   
