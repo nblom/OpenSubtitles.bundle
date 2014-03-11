@@ -8,7 +8,9 @@ OS_PLEX_USERAGENT = 'plexapp.com v9.0'
 subtitleExt       = ['utf','utf8','utf-8','sub','srt','smi','rt','ssa','aqt','jss','ass','idx']
  
 OS_ORDER_PENALTY = -1   # Penalty applied to subs score due to position in sub list return by OS.org
+OS_BAD_SUBTITLE_PENALTY = -1000 # Penalty applied to subs score due to flag bad subtitle in response.
 OS_TVSHOWS_GOOD_SEASON_BONUS = 30 # Bonus applied to TVShows subs if the season match
+
 
 #Useless since imdb ids seems to not be in metadata available for tv shows.
 OS_TVSHOWS_SHOW_IMDB_ID_MATCH_BONUS = 30 # Bonus applied to TVShows subs if the imdbID of the show match
@@ -53,12 +55,12 @@ def getLangList():
   return langList
 
 def logFilteredSubtitleResponseItem(item):
+  #Log('Keys available: %s' % subtitleResponse[0].keys())
   #Keys available: ['ISO639', 'SubComments', 'UserID', 'SubFileName', 'SubAddDate', 'SubBad', 'SubLanguageID', 'SeriesEpisode', 'MovieImdbRating', 'SubHash', 'MovieReleaseName', 'SubtitlesLink', 'IDMovie', 'SeriesIMDBParent', 'SubDownloadsCnt', 'QueryParameters', 'MovieByteSize', 'MovieKind', 'SeriesSeason', 'IDSubMovieFile', 'SubSize', 'IDSubtitle', 'IDSubtitleFile', 'MovieFPS', 'SubSumCD', 'QueryNumber', 'SubAuthorComment', 'MovieNameEng', 'MatchedBy', 'SubHD', 'SubRating', 'SubDownloadLink', 'SubHearingImpaired', 'ZipDownloadLink', 'SubFeatured', 'MovieTimeMS', 'SubActualCD', 'UserNickName', 'SubFormat', 'MovieHash', 'LanguageName', 'UserRank', 'MovieName', 'IDMovieImdb', 'MovieYear']
   Log(' - PlexScore: %d | MovieName: %s | MovieYear: %s | MovieNameEng: %s | SubAddDate: %s | SubBad: %s | SubRating: %s | SubDownloadsCnt: %s | IDMovie: %s | IDMovieImdb: %s' % (item['PlexScore'], item['MovieName'], item['MovieYear'], item['MovieNameEng'], item['SubAddDate'], item['SubBad'], item['SubRating'], item['SubDownloadsCnt'], item['IDMovie'], item['IDMovieImdb']))
 
 def logFilteredSubtitleResponse(subtitleResponse):
   #Prety way to display subtitleResponse in Logs sorted by PlexScore
-  #Keys available: ['ISO639', 'SubComments', 'UserID', 'SubFileName', 'SubAddDate', 'SubBad', 'SubLanguageID', 'SeriesEpisode', 'MovieImdbRating', 'SubHash', 'MovieReleaseName', 'SubtitlesLink', 'IDMovie', 'SeriesIMDBParent', 'SubDownloadsCnt', 'QueryParameters', 'MovieByteSize', 'MovieKind', 'SeriesSeason', 'IDSubMovieFile', 'SubSize', 'IDSubtitle', 'IDSubtitleFile', 'MovieFPS', 'SubSumCD', 'QueryNumber', 'SubAuthorComment', 'MovieNameEng', 'MatchedBy', 'SubHD', 'SubRating', 'SubDownloadLink', 'SubHearingImpaired', 'ZipDownloadLink', 'SubFeatured', 'MovieTimeMS', 'SubActualCD', 'UserNickName', 'SubFormat', 'MovieHash', 'LanguageName', 'UserRank', 'MovieName', 'IDMovieImdb', 'MovieYear']
   Log('Current subtitleResponse has %d elements:' % len(subtitleResponse))
   for item in sorted(subtitleResponse, key=lambda k: k['PlexScore'], reverse=True):
     logFilteredSubtitleResponseItem(item)
@@ -75,22 +77,34 @@ def fetchSubtitles(proxy, token, part, language):
     filteredSubtitleResponse = False
   else:
     subtitleResponse = proxyResponse['data']
-    #Log('Keys available: %s' % subtitleResponse[0].keys())
-    
-    #Start to score each subs
-    firstScore = 50
-    filteredSubtitleResponse = []
-    for sub in subtitleResponse:
-      #add default score
-      sub['PlexScore'] = firstScore;
-      filteredSubtitleResponse.append(sub)
-      firstScore = firstScore + OS_ORDER_PENALTY
+    #Start to process the results if the list is not empty
+    if subtitleResponse != False:
+      #Start to score each subs
+      firstScore = 50
+      filteredSubtitleResponse = []
+      #BUG to investigate with (Show: Suits, Season: 3, Ep: 10, id:97)
+      for sub in subtitleResponse:
+        #Add default score
+        sub['PlexScore'] = firstScore;
 
-    Log('hash/size search result: ')
-    #logFilteredSubtitleResponse(subtitleResponse)
+        #Add filters common to Movies and TVShows
+        
+        #Check if Bad Subs flag is set to 1
+        if int(sub['SubBad']) == 1:
+          sub['PlexScore'] = sub['PlexScore'] + OS_BAD_SUBTITLE_PENALTY
 
-    #Add filters for common to Movies and TVShows
-  
+        #TODO: filter depending on the subs rating
+
+        #TODO: filter depending on a pref on SubHearingImpaired
+
+        filteredSubtitleResponse.append(sub)
+        firstScore = firstScore + OS_ORDER_PENALTY
+
+      Log('hash/size search result: ')
+      #logFilteredSubtitleResponse(subtitleResponse)
+    else:
+      filteredSubtitleResponse = False
+
   return filteredSubtitleResponse
     
  
@@ -104,26 +118,33 @@ def filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata):
 
     #I don't know if I can filter on the name of the movie due to some metadata agent return Movie name in an other language.
 
+    #TODO: check if the imdbID match
+
     return subtitleResponse
   
 def filsterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media):
-  #I don't know if I can filter on the tvshow name as some metadata agent return TVShow name in other language.
-  # I don't know if I can filter on the episode dut to some difference beteween air order and DVD order.
+  # I can't filter on the tvshow name as some metadata agent return TVShow name in other language.
+  # I can't filter on the episode dut to some difference beteween air order and DVD order.
+  if subtitleResponse == False:
+    filteredSubtitleResponse = False
+  else:
+    filteredSubtitleResponse = []
+    for sub in subtitleResponse:
+      #If season match add a bonus to the score
+      if int(sub['SeriesSeason']) == int(season):
+        sub['PlexScore'] = sub['PlexScore'] + OS_TVSHOWS_GOOD_SEASON_BONUS
 
-  filteredSubtitleResponse = []
-  for sub in subtitleResponse:
-    #If season match add a bonus to the score
-    if int(sub['SeriesSeason']) == int(season):
-      sub['PlexScore'] = sub['PlexScore'] + OS_TVSHOWS_GOOD_SEASON_BONUS
+      #TODO: If imdbID match add a bonus to the score
+      #IDMovieImdb for episode
+      #SeriesIMDBParent for TVShow
+      #Impossible since IMDB id is not in metadata. Potential solution query theTVDB do find the IMDB from TVDB id
 
-    #If imdbID match add a bonus to the score
-    #IDMovieImdb for episode
-    #SeriesIMDBParent for TVShow
-    #Impossible since IMDB id is not in metadata. Potential solution query theTVDB do find the IMDB from TVDB id
+      #TODO: Check if video type match a tvshow
 
-    filteredSubtitleResponse.append(sub)
 
-  logFilteredSubtitleResponse(filteredSubtitleResponse)
+      filteredSubtitleResponse.append(sub)
+
+    logFilteredSubtitleResponse(filteredSubtitleResponse)
   return filteredSubtitleResponse
 
 def downloadBestSubtitle(subtitleResponse, part, language):
