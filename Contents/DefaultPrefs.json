@@ -27,5 +27,12 @@
                            "hin","hun","ice","ind","ita","jpn","kaz","kor","lat","lit","ltz","mac","may","nor","oci","pol","por","pob","rum","rus","srp","slo",
                            "slv","spa","swe","syr","tha","tur","ukr","urd","vie"],
                 "default": "None"
+        },
+        {
+                "id": "HearingImpairedPref",
+                "label": "Prefer Subtitle for Hearing Impaired",
+                "type": "enum",
+                "values": ["No", "Yes"],
+                "default": "No"
         }        
 ]
