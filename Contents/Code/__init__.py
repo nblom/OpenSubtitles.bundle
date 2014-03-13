@@ -11,6 +11,8 @@ OS_ORDER_PENALTY = -1   # Penalty applied to subs score due to position in sub l
 OS_BAD_SUBTITLE_PENALTY = -1000 # Penalty applied to subs score due to flag bad subtitle in response.
 OS_WRONG_MOVIE_KIND_PENALTY = -1000 # Penalty applied if the video have the wrong kind (episode or movie)
 OS_HEARING_IMPAIRED_BONUS = 10 # Bonus added for subs hearing impaired tagged when the pref is set to yes
+OS_SUBRATING_GOOD_BONUS = 20 # Bonnus added for subs with a rating of 0.0 or 10.0
+OS_SUBRATING_BAD_PENALTY = -100 # Penalty for subs with a rating between 1 and 4
 OS_TVSHOWS_GOOD_SEASON_BONUS = 30 # Bonus applied to TVShows subs if the season match
 OS_MOVIE_IMDB_MATCH_BONUS = 50 # Bonus applied for a movie if the imdb id return by OS match the metadata in Plex
 
@@ -84,7 +86,6 @@ def fetchSubtitles(proxy, token, part, language):
       #Start to score each subs
       firstScore = 50
       filteredSubtitleResponse = []
-      #BUG to investigate with (Show: Suits, Season: 3, Ep: 10, id:97)
       for sub in subtitleResponse:
         #Add default score
         sub['PlexScore'] = firstScore;
@@ -95,7 +96,11 @@ def fetchSubtitles(proxy, token, part, language):
         if int(sub['SubBad']) == 1:
           sub['PlexScore'] = sub['PlexScore'] + OS_BAD_SUBTITLE_PENALTY
 
-        #TODO: filter depending on the subs rating
+        #filter depending on the subs rating
+        if sub['SubRating']=='0.0' or sub['SubRating']=='10.0':
+          sub['PlexScore'] = sub['PlexScore'] + OS_SUBRATING_GOOD_BONUS
+        elif float(sub['SubRating'])>0.1 and float(sub['SubRating'])<4.1:
+          sub['PlexScore'] = sub['PlexScore'] + OS_SUBRATING_BAD_PENALTY
 
         #filter depending on a pref on SubHearingImpaired
         #TODO: Perhaps we can filter that just before download
@@ -103,6 +108,7 @@ def fetchSubtitles(proxy, token, part, language):
           sub['PlexScore'] = sub['PlexScore'] + OS_HEARING_IMPAIRED_BONUS
 
         filteredSubtitleResponse.append(sub)
+        #TODO: is this a good idea. With this there is no equality possible.
         firstScore = firstScore + OS_ORDER_PENALTY
 
       Log('hash/size search result: ')
@@ -177,7 +183,9 @@ def downloadBestSubtitle(subtitleResponse, part, language):
           subtitleResponse.remove(st)
   if subtitleResponse != False:
   #Download the sub with the higest PlexScore in the filtered list.
-  #TODO Perhaps choose in case of equality with Download count.
+  #TODO: Perhaps choose in case of equality with Download count.
+  #TODO: Perhaps HearingImpaired choice have to be done here
+  #TODO: Perhaps it is possible to chose more than one sub.
     st = sorted(subtitleResponse, key=lambda k: ['PlexScore'], reverse=True)[0] #most downloaded subtitle file for current language
     Log('Best subtitle is:')
     logFilteredSubtitleResponseItem(st)
