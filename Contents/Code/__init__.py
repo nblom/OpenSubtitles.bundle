@@ -18,14 +18,19 @@ OS_TVSHOWS_GOOD_SEASON_BONUS = 30 # Bonus applied to TVShows subs if the season 
 OS_MOVIE_IMDB_MATCH_BONUS = 50 # Bonus applied for a movie if the imdb id return by OS match the metadata in Plex
 OS_TVSHOWS_SHOW_IMDB_ID_MATCH_BONUS = 30 # Bonus applied to TVShows subs if the imdbID of the show match
 OS_TVSHOWS_EPISODE_IMDB_ID_MATCH_BONUS = 50 # Bonus applied to TVShows subs if the imdbID of the episode match
+OS_ACCEPTABLE_SCORE_TRIGGER = 0 #Subs with score below this trigger will be removed
 
 TVDB_SITE  = 'http://thetvdb.com'
 TVDB_PROXY = 'http://thetvdb.plexapp.com'
 TVDB_API_KEY    = 'D4DDDAEFAD083E6F'
-TVDB_SERIES_URL = '%s/api/%s/series/%%s' % (TVDB_PROXY,TVDB_API_KEY)
+#TODO: Check with a Plex developper if the new URL without API key is OK ?
+#TVDB_SERIES_URL = '%s/api/%s/series/%%s' % (TVDB_PROXY,TVDB_API_KEY) I use the adress below due to some HTML redirection badly interpreted by the current code in XML.ElementFromString()
+TVDB_SERIES_URL = '%s/data/series/%%s' % (TVDB_PROXY)
 
 HEADERS = {'User-agent': 'Plex/Nine'}
 
+# Function taken from TheTVDB metadata agent
+#TODO: Perhaps it is possible to use the function directly with the @expose decorator.
 def GetResultFromNetwork(url, fetchContent=True):
 
     Log("Retrieving URL: " + url)
@@ -78,8 +83,8 @@ def opensubtitlesProxy():
   return (proxy, token)
 
 def getImdBShowIdfromTheTVDB(guid):
+  #Extract from guid the primary data agent and the id of the show
   showIMDBId = False 
-  #Extract from guid the primary data agent ant de id of the epiosde
   m = re.match(r"(?P<primary_agent>.+):\/\/(?P<showID>\d+)", guid)
   if m != None:
     #Log("primary_agent: %s | showID: %s | seasonID: %s | episodeID: %s" % (m.group('primary_agent'), m.group('showID'), m.group('seasonID'), m.group('episodeID')))
@@ -94,16 +99,16 @@ def getImdBShowIdfromTheTVDB(guid):
   return  showIMDBId
   
 def getImdBEpisodeIdfromTheTVDB(guid):
-  Log("GUID episode: %s" % guid)
+  #Extract from guid the primary data agent and the id of the epiosde
+  #Log("GUID episode: %s" % guid)
   episodeIMDBId = False 
-  #Extract from guid the primary data agent ant de id of the epiosde
   m = re.match(r"(?P<primary_agent>.+):\/\/(?P<showID>\d+)\/(?P<seasonID>\d+)\/(?P<episodeID>\d+)", guid)
   if m != None:
     #Log("primary_agent: %s | showID: %s | seasonID: %s | episodeID: %s" % (m.group('primary_agent'), m.group('showID'), m.group('seasonID'), m.group('episodeID')))
     #If primary agent is TheTVDB, extract the tvshow and episode IMDN ids
     if m.group('primary_agent') ==  "com.plexapp.agents.thetvdb":
       #Fetch the IMDB episode ID
-      xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % m.group('showID')+'/default/'+m.group('seasonID')+'/'+m.group('episodeID')))
+      xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % m.group('showID')+'/default/'+m.group('seasonID')+'/'+m.group('episodeID')), encoding='utf8')
       episodeIMDBId = xml.xpath('//Data/Episode/IMDB_ID')[0].text
       if episodeIMDBId !=None:
         episodeIMDBId = episodeIMDBId.replace('tt', '')
@@ -122,9 +127,10 @@ def logFilteredSubtitleResponseItem(item):
   Log(' - PlexScore: %d | MovieName: %s | MovieKind: %s | SubBad: %s | SubHearingImpaired: %s | SubRating: %s | SubDownloadsCnt: %s | IDMovie: %s | IDMovieImdb: %s | SeriesIMDBParent: %s' % (item['PlexScore'], item['MovieName'], item['MovieKind'], item['SubBad'], item['SubHearingImpaired'], item['SubRating'], item['SubDownloadsCnt'], item['IDMovie'], item['IDMovieImdb'], item['SeriesIMDBParent']))
 
 def logFilteredSubtitleResponse(subtitleResponse):
-  #Prety way to display subtitleResponse in Logs sorted by PlexScore
+  #Prety way to display subtitleResponse in Logs sorted by PlexScore (and by download in case of equality)
   Log('Current subtitleResponse has %d elements:' % len(subtitleResponse))
-  for item in sorted(subtitleResponse, key=lambda k: k['PlexScore'], reverse=True):
+  tempSortedList = sorted(subtitleResponse, key=lambda k: int(k['SubDownloadsCnt']), reverse=True)
+  for item in sorted(tempSortedList, key=lambda k: k['PlexScore'], reverse=True):
     logFilteredSubtitleResponseItem(item)
     
 def fetchSubtitles(proxy, token, part, language):
@@ -160,7 +166,8 @@ def fetchSubtitles(proxy, token, part, language):
         elif float(sub['SubRating'])>0.1 and float(sub['SubRating'])<4.1:
           sub['PlexScore'] = sub['PlexScore'] + OS_SUBRATING_BAD_PENALTY
 
-        #TODO: Idea filter with the name of the file. Is this a good idea ? Not sure due to many users rename the files.
+        #TODO: Idea: filter with the name of the file. Is this a good idea ? Not sure due to many users rename the files.
+        #TODO: Idea: use movie duration and FPS to choose a good sub
 
         #filter depending on a pref on SubHearingImpaired
         #TODO: Perhaps we can filter that just before download
@@ -209,7 +216,7 @@ def filterSubtitleResponseForMovie(subtitleResponse, proxy, token, metadata):
   
 def filterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media, ImdbShowId, ImdbEpisodeId):
   # I can't filter on the tvshow name as some metadata agent return TVShow name in other language.
-  # I can't filter on the episode dut to some difference beteween air order and DVD order.
+  # I can't filter on the episode number due to some difference beteween air order and DVD order.
   if subtitleResponse == False:
     filteredSubtitleResponse = False
   else:
@@ -227,6 +234,7 @@ def filterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media, I
       if ImdbEpisodeId != False:
         if sub['IDMovieImdb'] == ImdbEpisodeId:
           sub['PlexScore'] = sub['PlexScore'] + OS_TVSHOWS_EPISODE_IMDB_ID_MATCH_BONUS
+      #TODO: Find a way to add a penalty fo an episode of the same TVshows/seanson but with the wrong episode when TheTVDB agent is not used or when IMDB id for episode is not in theTVDM database
       
       #Check if video type match a tvshow
       if sub['MovieKind'] != 'episode':
@@ -239,24 +247,32 @@ def filterSubtitleResponseForTVShow(subtitleResponse, season, metadata, media, I
   return filteredSubtitleResponse
 
 def downloadBestSubtitle(subtitleResponse, part, language):
-  #Suppress all subtitle format no supported
+  #Suppress all subtitle format no supported and subtitle with score under the qualification trigger
   if subtitleResponse != False:
+      #Change the way of filterin because subtitleResponse.remove doesn't work well in this case
+      filteredSubtitleResponse = []
       for st in subtitleResponse: #remove any subtitle formats we don't recognize
         if st['SubFormat'] not in subtitleExt:
           Log('Removing a subtitle of type: ' + st['SubFormat'])
-          subtitleResponse.remove(st)
-  if subtitleResponse != False:
+        elif st['PlexScore'] < OS_ACCEPTABLE_SCORE_TRIGGER: #remove any subtitle with score under the acceptable trigger
+          Log('Removing a subtitle with score(%d) under the acceptable trigger (%d)' % (st['PlexScore'], OS_ACCEPTABLE_SCORE_TRIGGER))
+        else:
+          filteredSubtitleResponse.append(st)
+
+  if filteredSubtitleResponse != False:
   #Download the sub with the higest PlexScore in the filtered list.
-  #TODO: Perhaps choose in case of equality with Download count.
   #TODO: Perhaps HearingImpaired choice have to be done here
   #TODO: Perhaps it is possible to chose more than one sub.
-    st = sorted(subtitleResponse, key=lambda k: ['PlexScore'], reverse=True)[0] #most downloaded subtitle file for current language
+    #To process equality on PlexScore, first order with the download count
+    tempSortedList = sorted(filteredSubtitleResponse, key=lambda k: int(k['SubDownloadsCnt']), reverse=True)
+    # The best subtitle is the ons with the best PlexScore
+    st = sorted(tempSortedList, key=lambda k: k['PlexScore'], reverse=True)[0]
     Log('Best subtitle is:')
     logFilteredSubtitleResponseItem(st)
     subUrl = st['SubDownloadLink']
     subGz = HTTP.Request(subUrl, headers={'Accept-Encoding':'gzip'}).content
     subData = Archive.GzipDecompress(subGz)
-    # Supression of previous sub should be there to avoid wiping a sub not anymore in OS
+    # TODO : Supression of previous sub should be there to avoid wiping a sub not anymore in OS
     part.subtitles[Locale.Language.Match(st['SubLanguageID'])][subUrl] = Proxy.Media(subData, ext=st['SubFormat'])
   else:
     Log('No subtitles available for language ' + language)
