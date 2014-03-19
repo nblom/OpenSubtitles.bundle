@@ -171,8 +171,8 @@ def fetchSubtitles(proxy, token, part, language):
 
         #filter depending on a pref on SubHearingImpaired
         #TODO: Perhaps we can filter that just before download
-        if Prefs['HearingImpairedPref'] == 'Yes' and int(sub['SubHearingImpaired'])==1:
-          sub['PlexScore'] = sub['PlexScore'] + OS_HEARING_IMPAIRED_BONUS
+        #if Prefs['HearingImpairedPref'] == 'Yes' and int(sub['SubHearingImpaired'])==1:
+        #  sub['PlexScore'] = sub['PlexScore'] + OS_HEARING_IMPAIRED_BONUS
 
         filteredSubtitleResponse.append(sub)
         #Currently the following code is useless since the OS_ORDER_PENALTY is set to 0 (waiting better default order from OS.org)
