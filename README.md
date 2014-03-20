@@ -20,10 +20,10 @@ So this fork is a mock-up to try to have better result by making some consistenc
 
 ## How to help ?
 
-  - Download the package from this last release
-  - Replace the old metadata agent (OpenSubtitles.bundle) in Plugin folder by this new one.
+  - Download the zip package from this last release: [on the Github Release page][1]
+  - Replace the old metadata agent (OpenSubtitles.bundle) in Plugin folder by the new one in the zip archive. Don't forget to rename it with the name "OpenSubtitles.bundle" (remove the tag reference in the bundle name).
   - Try to used it to check if results are improved.
-  - Share your results on the Plex Forums
+  - Share your comments and results on the Plex Forums [on this thread][2]
   - Give your ideas on the algorithm
   - Open issues on Github with usefull information (like video name, hash, size, sub language and logs)
 
@@ -62,7 +62,7 @@ The main idea is to compare metadata associated to the subtitle file in the Open
 ## FAQ
 
 ### Where are the logs ?
-See Plex help subject: [Channel Log Files][1]
+See Plex help subject: [Channel Log Files][3]
 The log file of this metadata agent is in the file **com.plexapp.agents.opensubtitles**
 
 ### How to find the hash and size of my video ?
@@ -79,4 +79,6 @@ Simple. Suppress the OpenSubtitles.bundle folder in the Plugin folder and quit a
 > Written with [StackEdit](https://stackedit.io/).
 
 
-  [1]: https://plexapp.zendesk.com/hc/en-us/articles/201106148-Channel-Log-Files
+  [1]: https://github.com/oncleben31/OpenSubtitles.bundle/releases
+  [2]: https://forums.plex.tv/index.php/topic/102923-mock-up-for-opensubtitles-metadata-agent-improvement/
+  [3]: https://plexapp.zendesk.com/hc/en-us/articles/201106148-Channel-Log-Files
