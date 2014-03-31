@@ -3,7 +3,7 @@
 ------
 ## Why this fork ?
 
-This fork is a mock-up for an improvement of the Plex metadata agent used by default to fetch subtitles on OpenSubtitles.org.
+This fork is a prototype for an improvement of the Plex metadata agent used by default to fetch subtitles on OpenSubtitles.org.
 
 The origin version used a simple algorithm:
 > - Search subs by using hash and size of the video file
