@@ -11,9 +11,10 @@ OS_ORDER_PENALTY = 0   # Penalty applied to subs score due to position in sub li
 OS_BAD_SUBTITLE_PENALTY = -1000 # Penalty applied to subs score due to flag bad subtitle in response.
 OS_WRONG_MOVIE_KIND_PENALTY = -1000 # Penalty applied if the video have the wrong kind (episode or movie)
 OS_HEARING_IMPAIRED_BONUS = 10 # Bonus added for subs hearing impaired tagged when the pref is set to yes
-OS_SUBRATING_GOOD_BONUS = 20 # Bonnus added for subs with a rating of 0.0 or 10.0
+OS_SUBRATING_GOOD_BONUS = 20 # Bonus added for subs with a rating of 0.0 or 10.0
 OS_SUBRATING_BAD_PENALTY = -100 # Penalty for subs with a rating between 1 and 4
 OS_TVSHOWS_GOOD_SEASON_BONUS = 30 # Bonus applied to TVShows subs if the season match
+OS_TVSHOWS_GOOD_EPISODE_BONUS =  10 # Bonus applied if TH shows epiode number match
 OS_MOVIE_IMDB_MATCH_BONUS = 50 # Bonus applied for a movie if the imdb id return by OS match the metadata in Plex
 OS_TVSHOWS_SHOW_IMDB_ID_MATCH_BONUS = 30 # Bonus applied to TVShows subs if the imdbID of the show match
 OS_TVSHOWS_EPISODE_IMDB_ID_MATCH_BONUS = 50 # Bonus applied to TVShows subs if the imdbID of the episode match
@@ -79,12 +80,17 @@ def opensubtitlesProxy():
   if username == None or password == None:
     username = ''
     password = ''
-  proxyResponse = proxy.LogIn(username, password, 'en', OS_PLEX_USERAGENT)
-  if proxyResponse['status'] != "200 OK":
-    Log('Error return by XMLRPC proxy: %s' % proxyResponse['status'])
+  try:
+    proxyResponse = proxy.LogIn(username, password, 'en', OS_PLEX_USERAGENT)
+    if proxyResponse['status'] != "200 OK":
+      Log('Error return by XMLRPC proxy: %s' % proxyResponse['status'])
+      token = False
+    else:
+      token = proxyResponse['token']
+  except Exception, e:
+    Log('Unexpected error with OpenSubtitles.org XMLRPC API : %s' % str(e))
     token = False
-  else:
-    token = proxyResponse['token']
+
  
   return (proxy, token)
 
@@ -140,7 +146,7 @@ def getLangList():
 def logFilteredSubtitleResponseItem(item):
   #Log('Keys available: %s' % subtitleResponse[0].keys())
   #Keys available: ['ISO639', 'SubComments', 'UserID', 'SubFileName', 'SubAddDate', 'SubBad', 'SubLanguageID', 'SeriesEpisode', 'MovieImdbRating', 'SubHash', 'MovieReleaseName', 'SubtitlesLink', 'IDMovie', 'SeriesIMDBParent', 'SubDownloadsCnt', 'QueryParameters', 'MovieByteSize', 'MovieKind', 'SeriesSeason', 'IDSubMovieFile', 'SubSize', 'IDSubtitle', 'IDSubtitleFile', 'MovieFPS', 'SubSumCD', 'QueryNumber', 'SubAuthorComment', 'MovieNameEng', 'MatchedBy', 'SubHD', 'SubRating', 'SubDownloadLink', 'SubHearingImpaired', 'ZipDownloadLink', 'SubFeatured', 'MovieTimeMS', 'SubActualCD', 'UserNickName', 'SubFormat', 'MovieHash', 'LanguageName', 'UserRank', 'MovieName', 'IDMovieImdb', 'MovieYear']
-  Log(' - PlexScore: %d | MovieName: %s | MovieKind: %s | SubFileName: %s | SubBad: %s | SubHearingImpaired: %s | SubRating: %s | SubDownloadsCnt: %s | IDMovie: %s | IDMovieImdb: %s | SeriesIMDBParent: %s | MovieReleaseName:%s |MovieFPS: %s | MovieTimeMS: %s' % (item['PlexScore'], item['MovieName'], item['MovieKind'], item['SubFileName'], item['SubBad'], item['SubHearingImpaired'], item['SubRating'], item['SubDownloadsCnt'], item['IDMovie'], item['IDMovieImdb'], item['SeriesIMDBParent'], item['MovieReleaseName'], item['MovieFPS'], item['MovieTimeMS']))
+  Log(' - PlexScore: %d | MovieName: %s | MovieKind: %s | SubFileName: %s | SubBad: %s | SubHearingImpaired: %s | SubRating: %s | SubDownloadsCnt: %s | IDMovie: %s | IDMovieImdb: %s | SeriesIMDBParent: %s | MovieReleaseName:%s |MovieFPS: %s | MovieTimeMS: %s | SeriesEpisode:%s' % (item['PlexScore'], item['MovieName'], item['MovieKind'], item['SubFileName'], item['SubBad'], item['SubHearingImpaired'], item['SubRating'], item['SubDownloadsCnt'], item['IDMovie'], item['IDMovieImdb'], item['SeriesIMDBParent'], item['MovieReleaseName'], item['MovieFPS'], item['MovieTimeMS'], item['SeriesEpisode']))
 
 def logFilteredSubtitleResponse(subtitleResponse):
   #Prety way to display subtitleResponse in Logs sorted by PlexScore (and by download in case of equality)
@@ -257,7 +263,6 @@ def filterSubtitleResponseForTVShow(subtitleResponse, season, episode, metadata,
       if ImdbEpisodeId != False:
         if sub['IDMovieImdb'] == ImdbEpisodeId:
           sub['PlexScore'] = sub['PlexScore'] + OS_TVSHOWS_EPISODE_IMDB_ID_MATCH_BONUS
-      #TODO: Find a way to add a penalty fo an episode of the same TVshows/seanson but with the wrong episode when TheTVDB agent is not used or when IMDB id for episode is not in theTVDM database
       
       #Check if video type match a tvshow
       if sub['MovieKind'] != 'episode':
@@ -271,8 +276,13 @@ def filterSubtitleResponseForTVShow(subtitleResponse, season, episode, metadata,
           
         if sub['MovieName'].strip().lower() == '"%s" %s' % (media.title.strip().lower(), media.seasons[season].episodes[episode].title.strip().lower()):
           sub['PlexScore'] = sub['PlexScore'] + OS_TITLE_MATCH_BONUS
-          Log('Movie Title match')
+          Log('Episode Title match')
 
+      #Check episode number.
+      #TODO: Is there a way to handle this correctly if DVD order is used ?
+      if sub['SeriesEpisode'] == episode:
+        Log('Episode number match')
+        sub['PlexScore'] = sub['PlexScore'] + OS_TVSHOWS_GOOD_EPISODE_BONUS
 
       filteredSubtitleResponse.append(sub)
 
