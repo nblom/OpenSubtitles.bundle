@@ -30,6 +30,10 @@ TVDB_SERIES_URL = '%s/data/series/%%s' % (TVDB_PROXY)
 
 HEADERS = {'User-agent': 'Plex/Nine'}
 
+#Class to identify different search mode
+class OS_Search_Methode:
+    Hash, IMDB, Name = range(0, 3)
+
 # Function taken from TheTVDB metadata agent
 #TODO: Perhaps it is possible to use the function directly with the @expose decorator.
 def GetResultFromNetwork(url, fetchContent=True):
@@ -158,11 +162,22 @@ def logFilteredSubtitleResponse(subtitleResponse):
   else:
     Log('Current subtitleResponse is empty')
     
-def fetchSubtitles(proxy, token, part, language, primaryAgentLanguage):
-  # Download OS result based on hash and size
-  Log('Looking for match for GUID %s and size %d and language %s' % (part.openSubtitleHash, part.size, language))
-  #TODO: is there a way to play with cachetime. Perhaps we can set is to 0 if Air date or date of adding to base < 48h
-  proxyResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])
+def fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, searchMethode):
+  if searchMethode == OS_Search_Methode.Hash:
+    # Download OS result based on hash and size
+    Log('Looking for match for GUID %s and size %d and language %s' % (part.openSubtitleHash, part.size, language))
+    #TODO: is there a way to play with cachetime. Perhaps we can set is to 0 if Air date or date of adding to base < 48h
+    proxyResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])
+
+  elif searchMethode == OS_Search_Methode.IMDB:
+    #Download OS result based on IMDB id
+    #TODO: complete IMDB search
+    Log('Looking for match for IMDB and language %s' % ( language))
+  elif searchMethode == OS_Search_Methode.Name:
+    #Download OS result based on Name
+    #TODO: complete Name search
+    Log('Looking for match for name and language %s' % ( language))
+
   #Check Server Response status
   if proxyResponse['status'] != "200 OK":
     Log('Error return by XMLRPC proxy: %s' % proxyResponse['status'])
@@ -353,7 +368,7 @@ class OpenSubtitlesAgentMovies(Agent.Movies):
 
           # go fetch subtilte fo each language
           for language in getLangList():
-            subtitleResponse = fetchSubtitles(proxy, token, part, language, primaryAgentLanguage)
+            subtitleResponse = fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, OS_Search_Methode.Hash)
             subtitleResponse = filterSubtitleResponseForMovie(subtitleResponse, proxy, token, media, metadata, primaryAgentLanguage)
             downloadBestSubtitle(subtitleResponse, part, language)
             
@@ -395,7 +410,7 @@ class OpenSubtitlesAgentTV(Agent.TV_Shows):
 
                 # go fetch subtilte fo each language
                 for language in getLangList():
-                  subtitleResponse = fetchSubtitles(proxy, token, part, language, primaryAgentLanguage)
+                  subtitleResponse = fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, OS_Search_Methode.Hash)
                   subtitleResponse = filterSubtitleResponseForTVShow(subtitleResponse, season, episode, metadata, media, ImdbShowId, ImdbEpisodeId, primaryAgentLanguage)
                   downloadBestSubtitle(subtitleResponse, part, language)
                     
