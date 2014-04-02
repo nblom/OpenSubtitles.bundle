@@ -167,6 +167,7 @@ def fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, searchMet
     # Download OS result based on hash and size
     Log('Looking for match for GUID %s and size %d and language %s' % (part.openSubtitleHash, part.size, language))
     #TODO: is there a way to play with cachetime. Perhaps we can set is to 0 if Air date or date of adding to base < 48h
+    #BUG with 503 response
     proxyResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'moviehash':part.openSubtitleHash, 'moviebytesize':str(part.size)}])
 
   elif searchMethode == OS_Search_Methode.IMDB:

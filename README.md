@@ -40,15 +40,19 @@ The main idea is to compare metadata associated to the subtitle file in the Open
 > - If subs rating is between 0.1 and 4.1 then reduce the score  with OS_SUBRATING_BAD_PENALTY penalty (currently 100)
 
 
+
 ### Only for movies
 >  - If sub movieKind attribute is not set to "movie" then reduce the score with OS_WRONG_MOVIE_KIND_PENALTY penalty (currently 1000)
 >  - If IMDB id associated to the sub match the IMDB id associated to the video file add a bonus OS_MOVIE_IMDB_MATCH_BONUS to the score. (currently 50)
+>  - If movie name match (only if you use english language for your primary agent) then add a bonus OS_TITLE_MATCH_BONUS to the score (currently 10)
 
 ### Only for TV shows
 >  - If sub movieKind attribute is not set to "episode" then reduce the score with OS_WRONG_MOVIE_KIND_PENALTY penalty (currently 1000)
 >  - If episode IMDB id associated to the sub match the episode IMDB id associated to the video file (only if you use TheTVDB as primary agent) then add a bonus OS_TVSHOWS_EPISODE_IMDB_ID_MATCH_BONUS to the score. (currently 50)
 >  - If show IMDB id associated to the sub match the show IMDB id associated to the video file (only if you use TheTVDB as primary agent) then add a bonus OS_TVSHOWS_SHOW_IMDB_ID_MATCH_BONUS  to the score. (currently 30)
 >  - If season associated to the sub match the season of the video file then add a bonus OS_TVSHOWS_GOOD_SEASON_BONUS to the score (currently 30)
+>  - If show and episode name match (only if you use english language for your primary agent) then add a bonus OS_TITLE_MATCH_BONUS to the score (currently 10)
+>  - If episode number match then add a bonus OS_TVSHOWS_GOOD_EPISODE_BONUS to the score (currently 10)
 
 ### Selection of the best subtitle
 
