@@ -174,7 +174,7 @@ def fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, ImbdbId, 
 
   elif searchMethode == OS_Search_Methode.IMDB:
     #Download OS result based on IMDB id
-    Log('Looking for match for IMDB and language %s' % ( language))
+    Log('Looking for match for IMDB %s and language %s' % (ImbdbId, language))
     proxyResponse = proxy.SearchSubtitles(token,[{'sublanguageid':language, 'imdbid':ImbdbId}])
     
   elif searchMethode == OS_Search_Methode.Name:
@@ -366,7 +366,12 @@ class OpenSubtitlesAgentMovies(Agent.Movies):
           # go fetch subtilte fo each language
           for language in getLangList():
             #subtitleResponse = fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, ImdbId, OS_Search_Methode.Hash)
-            subtitleResponse = fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, ImdbId, OS_Search_Methode.IMDB)
+            # Test to protect IMDB search if IMDB id is None.
+            if ImdbId != None:
+              subtitleResponse = fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, ImdbId, OS_Search_Methode.IMDB)
+            else:
+              subtitleResponse = False
+              Log('Impossible to search with IMDB id because impossible to get one from primary agent')
             subtitleResponse = filterSubtitleResponseForMovie(subtitleResponse, proxy, token, media, metadata, ImdbId, primaryAgentLanguage)
             downloadBestSubtitle(subtitleResponse, part, language)
             
@@ -391,6 +396,7 @@ class OpenSubtitlesAgentTV(Agent.TV_Shows):
       #BUG: this search in metadata agent return no result an in the web search there are results
       #http://www.opensubtitles.org/fr/search/sublanguageid-eng/moviebytesize-259882514/moviehash-330999989ae4f902
       ImdbShowId = getImdBShowIdfromTheTVDB(media.guid)
+      
       for season in media.seasons:
         # just like in the Local Media Agent, if we have a date-based season skip for now.
         if int(season) < 1900:
@@ -409,7 +415,13 @@ class OpenSubtitlesAgentTV(Agent.TV_Shows):
                 # go fetch subtilte fo each language
                 for language in getLangList():
                   #subtitleResponse = fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, ImdbEpisodeId, OS_Search_Methode.Hash)
-                  subtitleResponse = fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, ImdbEpisodeId, OS_Search_Methode.IMDB)
+                  
+                  # Test to protect IMDB search if IMDB id is None.
+                  if ImdbEpisodeId != None:
+                    subtitleResponse = fetchSubtitles(proxy, token, part, language, primaryAgentLanguage, ImdbEpisodeId, OS_Search_Methode.IMDB)
+                  else:
+                    subtitleResponse = False
+                    Log('Impossible to search with IMDB id because impossible to get one from primary agent')
                   subtitleResponse = filterSubtitleResponseForTVShow(subtitleResponse, season, episode, metadata, media, ImdbShowId, ImdbEpisodeId, primaryAgentLanguage)
                   downloadBestSubtitle(subtitleResponse, part, language)
                     
