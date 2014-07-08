@@ -143,8 +143,14 @@ def getImdBEpisodeIdfromTheTVDB(guid):
             
 def getLangList():
   langList = [Prefs["langPref1"]]
-  if Prefs["langPref2"] != 'None' and Prefs["langPref1"] != Prefs["langPref2"]:
+  if Prefs["langPref2"] != 'None' and Prefs["langPref2"] not in langList:
     langList.append(Prefs["langPref2"])
+  if Prefs["langPref3"] != 'None' and Prefs["langPref3"] not in langList:
+    langList.append(Prefs["langPref3"])
+  if Prefs["langPref4"] != 'None' and Prefs["langPref4"] not in langList:
+    langList.append(Prefs["langPref4"])
+  if Prefs["langPref5"] != 'None' and Prefs["langPref5"] not in langList:
+    langList.append(Prefs["langPref5"]) 
   return langList
 
 def logFilteredSubtitleResponseItem(item):

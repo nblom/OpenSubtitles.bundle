@@ -29,6 +29,33 @@
                 "default": "None"
         },
         {
+                "id": "langPref3",
+                "label": "Subtitle Language (3)",
+                "type": "enum",
+                "values": ["None","eng","alb","ara","arm","bos","bul","cat","chi","hrv","cze","dan","dut","epo","est","fas","fin","fre","lgl","geo","ger","ell","heb",
+                           "hin","hun","ice","ind","ita","jpn","kaz","kor","lat","lit","ltz","mac","may","nor","oci","pol","por","pob","rum","rus","srp","slo",
+                           "slv","spa","swe","syr","tha","tur","ukr","urd","vie"],
+                "default": "None"
+        },
+        {
+                "id": "langPref4",
+                "label": "Subtitle Language (4)",
+                "type": "enum",
+                "values": ["None","eng","alb","ara","arm","bos","bul","cat","chi","hrv","cze","dan","dut","epo","est","fas","fin","fre","lgl","geo","ger","ell","heb",
+                           "hin","hun","ice","ind","ita","jpn","kaz","kor","lat","lit","ltz","mac","may","nor","oci","pol","por","pob","rum","rus","srp","slo",
+                           "slv","spa","swe","syr","tha","tur","ukr","urd","vie"],
+                "default": "None"
+        },
+        {
+                "id": "langPref5",
+                "label": "Subtitle Language (5)",
+                "type": "enum",
+                "values": ["None","eng","alb","ara","arm","bos","bul","cat","chi","hrv","cze","dan","dut","epo","est","fas","fin","fre","lgl","geo","ger","ell","heb",
+                           "hin","hun","ice","ind","ita","jpn","kaz","kor","lat","lit","ltz","mac","may","nor","oci","pol","por","pob","rum","rus","srp","slo",
+                           "slv","spa","swe","syr","tha","tur","ukr","urd","vie"],
+                "default": "None"
+        },
+        {
                 "id": "HearingImpairedPref",
                 "label": "Prefer Subtitle for Hearing Impaired",
                 "type": "enum",
